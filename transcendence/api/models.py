@@ -7,3 +7,12 @@ class User(AbstractUser):
     def __str__(self):
         return self.nickname # Permet qu'une instance de User soit affichee via son nickname et non <User object (id)>
     
+class Game(models.Model):
+    player1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='games_as_player1') # on_delete=models.CASCADE : Si un utilisateur est supprimé, ses parties le sont aussi.
+    player2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='games_as_player2')
+    score_player1 = models.IntegerField(default=0)
+    score_player2 = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.player1} vs {self.player2} - {self.score_player1}:{self.score_player2}"
