@@ -30,28 +30,19 @@ def users_list(request):
         # Lister les utilisateurs.
         # curl http://127.0.0.1:8000/api/users/
 
-######## URL: users/id/ , ENDPOINTS: GET ############
+######## URL: users/id/ , ENDPOINTS: GET | PUT ############
 
+@csrf_exempt 
 def user_detail(request, id):
+    user = get_object_or_404(User, id=id)
     if request.method == 'GET':
-        user = get_object_or_404(User, id=id)
         response_data = {
             'id': user.id,
             'username': user.username,
             'nickname': user.nickname,
         }
         return JsonResponse(response_data, status=200)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-        #TEST:
-        # curl http://127.0.0.1:8000/api/users/1/
-
-######## URL: users/id/update/ , ENDPOINTS: PUT ############
-
-@csrf_exempt 
-def update_user(request, id):
-    user = get_object_or_404(User, id=id)
-    if request.method == 'PUT':
+    elif request.method == 'PUT':
         data = json.loads(request.body)
         if 'username' in data:
             user.username = data['username']
@@ -66,9 +57,16 @@ def update_user(request, id):
             'nickname': user.nickname,
         }
         return JsonResponse(response_data, status=200)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+    elif request.method == 'DELETE':
+        user.delete()
+        return JsonResponse({'message': f'User with id {id} has been deleted.'}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-    #TEST: curl -X PUT http://127.0.0.1:8000/api/users/1/update/ -H "Content-Type: application/json" -d '{"username": "new_username", "password": "123454", "nickname": "new_nickname"}'
+        #TEST:
+        # curl http://127.0.0.1:8000/api/users/1/
+        # curl -X PUT http://127.0.0.1:8000/api/users/1/update/ -H "Content-Type: application/json" -d '{"username": "new_username", "password": "123454", "nickname": "new_nickname"}'
+        # curl -X DELETE http://127.0.0.1:8000/api/users/1/
 
 ######## URL: games/ , ENDPOINTS: GET | POST ############
 
@@ -92,12 +90,14 @@ def games_list(request):
         # curl -X POST http://127.0.0.1:8000/api/games/ -H "Content-Type: application/json" -d '{"player1_id": "1", "player2_id": "2", "score_player1":"21", "score_player2":"232"}'
         # curl http://127.0.0.1:8000/api/games/ 
 
-######## URL: games/id/ , ENDPOINTS: GET ############
+######## URL: games/id/ , ENDPOINTS: GET | PUT  ############
 
+@csrf_exempt
 def game_detail(request, id):
-    if request.method == 'GET':
-        game = get_object_or_404(Game, id=id)
-        response_data = {
+    game = get_object_or_404(Game, id=id)
+
+    def serialize_game(game):
+        return {
             'id': game.id,
             'player1': {
                 'id': game.player1.id,
@@ -109,10 +109,37 @@ def game_detail(request, id):
             },
             'score_player1': game.score_player1,
             'score_player2': game.score_player2,
-            'created_at': game.created_at.isoformat(),  # Format reconnaissable en JSON
+            'created_at': game.created_at.isoformat(),
         }
+
+    if request.method == 'GET':
+        response_data = serialize_game(game)
         return JsonResponse(response_data, status=200)
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            if 'player1_id' in data:
+                player1 = get_object_or_404(User, id=data['player1_id'])
+                game.player1 = player1
+            if 'player2_id' in data:
+                player2 = get_object_or_404(User, id=data['player2_id'])
+                game.player2 = player2
+            if 'score_player1' in data:
+                game.score_player1 = int(data['score_player1'])  # Conversion explicite en int
+            if 'score_player2' in data:
+                game.score_player2 = int(data['score_player2'])
+            game.save()
+            response_data = serialize_game(game)
+            return JsonResponse(response_data, status=200)
+        except (KeyError, ValueError) as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    elif request.method == 'DELETE':
+        game.delete()
+        return JsonResponse({'message': f'Gaeme with id {id} has been deleted.'}, status=200)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
         #TEST:
         # curl http://127.0.0.1:8000/api/games/1/
+        # curl -X PUT http://127.0.0.1:8000/api/games/1/ -H "Content-Type: application/json" -d '{"player1_id": "1", "player2_id": "2", "score_player1":"2", "score_player2":"1"}'
+        # curl -X DELETE http://127.0.0.1:8000/api/games/1/
